@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
+import 'package:image/image.dart' as img;
 import 'dart:io';
 
 void main() {
@@ -40,8 +41,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
   FlutterSoundRecorder? _audioRecorder;
   bool _recorderIsInited = false;
   bool _isRecording = false;
-  String _audioPath =
-      'audio_record.mp4'; // You can choose your preferred audio format
+  String _audioPath = '';
+  List<int> _slideTimestamps = [];
 
   @override
   void initState() {
@@ -73,8 +74,12 @@ class _LectureRecorderState extends State<LectureRecorder> {
     });
   }
 
+  int _recordingStartTime = 0;
+
   void _startRecording() async {
     if (!_recorderIsInited) return;
+    Directory tempDir = await getTemporaryDirectory();
+    _audioPath = '${tempDir.path}/audio_record.mp4';
     await _audioRecorder!.startRecorder(
       toFile: _audioPath,
       codec: Codec.aacMP4,
@@ -82,6 +87,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     );
     setState(() {
       _isRecording = true;
+      _slideTimestamps.add(DateTime.now().millisecondsSinceEpoch);
     });
   }
 
@@ -91,11 +97,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
     setState(() {
       _isRecording = false;
     });
-    //_mergeAudioAndVideo(videoPath, audioPath)
+    // Merge audio and video after stopping the recording
+    _mergeAudioAndVideo();
   }
 
-  // Other variables and methods for handling audio, video, and recording will be placed here.
-  // ...
   Future<void> _selectPdfAndLoad() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -116,11 +121,76 @@ class _LectureRecorderState extends State<LectureRecorder> {
     }
   }
 
-  void _mergeAudioAndVideo(String videoPath, String audioPath) async {
+  Future<void> _generateVideoFromSlides() async {
+    if (_pdfDocument == null) return;
+
+    List<File> slideImages = [];
+
+    // Convert PDF pages to images
+    for (int i = 0; i < _pdfDocument!.pageCount; i++) {
+      final page = await _pdfDocument!.getPage(i + 1);
+      final pdfImage = await page.render();
+      final image = img.Image.fromBytes(
+        pdfImage.width,
+        pdfImage.height,
+        pdfImage.pixels.buffer.asUint8List(),
+        format: img.Format.rgba,
+      );
+      final pngBytes = img.encodePng(image);
+      final tempDir = await getTemporaryDirectory();
+      final imageFile = File('${tempDir.path}/slide_$i.png');
+      await imageFile.writeAsBytes(pngBytes);
+
+      slideImages.add(imageFile);
+    }
+
+    // Generate video from slide images
+    final tempDir = await getTemporaryDirectory();
+    final videoPath = '${tempDir.path}/video_slides.mp4';
+
     final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
-    String outputPath = 'merged_output.mp4'; // Output file path
+
+    // Create a temporary file with the list of input files and durations
+    final concatFileContent = _slideTimestamps.asMap().entries.map((entry) {
+      int i = entry.key;
+      int duration = i < _slideTimestamps.length - 1
+          ? _slideTimestamps[i + 1] - _slideTimestamps[i]
+          : 5000; // Set a default duration for the last slide
+      return 'file ${slideImages[i].path}\nduration ${duration / 1000}';
+    }).join('\n');
+    final concatFilePath = '${tempDir.path}/concat.txt';
+    final concatFile = File(concatFilePath);
+    await concatFile.writeAsString(concatFileContent);
+
+    // Generate the video using the concat demuxer
     int returnCode = await _flutterFFmpeg.execute(
-        '-i $videoPath -i $audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath');
+        '-f concat -safe 0 -i $concatFilePath -vsync vfr -pix_fmt yuv420p -y $videoPath');
+
+    if (returnCode == 0) {
+      // Success
+      print('Generated video from slides successfully: $videoPath');
+    } else {
+      // Error
+      print('Error generating video from slides: $returnCode');
+    }
+
+    // Clean up temporary slide image files and concat file
+    for (final imageFile in slideImages) {
+      await imageFile.delete();
+    }
+    await concatFile.delete();
+  }
+
+  void _mergeAudioAndVideo() async {
+    await _generateVideoFromSlides();
+
+    // Merge the video stream with the recorded audio
+    final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
+    Directory tempDir = await getTemporaryDirectory();
+    String videoPath = '${tempDir.path}/video_slides.mp4';
+    String outputPath = '${tempDir.path}/merged_output.mp4'; // Output file path
+    int returnCode = await _flutterFFmpeg.execute(
+        '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath');
 
     if (returnCode == 0) {
       // Success
@@ -168,6 +238,9 @@ class _LectureRecorderState extends State<LectureRecorder> {
                           setState(() {
                             _currentPageIndex--;
                           });
+                          if (_isRecording) {
+                            _slideTimestamps.removeLast();
+                          }
                         }
                       : null,
                   icon: const Icon(Icons.arrow_back),
@@ -179,6 +252,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
                     setState(() {
                       _currentPageIndex++;
                     });
+                    if (_isRecording) {
+                      _slideTimestamps
+                          .add(DateTime.now().millisecondsSinceEpoch);
+                    }
                   },
                   icon: const Icon(Icons.arrow_forward),
                 ),

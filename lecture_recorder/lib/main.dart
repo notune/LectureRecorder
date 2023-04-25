@@ -41,7 +41,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
   bool _recorderIsInited = false;
   bool _isRecording = false;
   String _audioPath =
-      'audio_record.mp3'; // You can choose your preferred audio format
+      'audio_record.mp4'; // You can choose your preferred audio format
 
   @override
   void initState() {
@@ -77,7 +77,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (!_recorderIsInited) return;
     await _audioRecorder!.startRecorder(
       toFile: _audioPath,
-      codec: Codec.mp3, // Change this to your preferred codec
+      codec: Codec.aacMP4,
       audioSource: AudioSource.microphone,
     );
     setState(() {
@@ -91,6 +91,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     setState(() {
       _isRecording = false;
     });
+    //_mergeAudioAndVideo(videoPath, audioPath)
   }
 
   // Other variables and methods for handling audio, video, and recording will be placed here.
@@ -106,8 +107,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
         File file = File(result.files.single.path!);
         final doc = await PdfDocument.openFile(file.path);
         setState(() {
-          _pdfDocumentLoader = PdfDocumentLoader.openAsset(
-              file.path); // This line can be removed.
+          _pdfDocumentLoader = PdfDocumentLoader.openFile(file.path);
           _pdfDocument = doc;
         });
       }

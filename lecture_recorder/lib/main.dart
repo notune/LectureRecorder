@@ -44,6 +44,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
   String _audioPath = '';
   List<dynamic> _slideTimestamps = [];
 
+  bool _isMerging = false;
+
   @override
   void initState() {
     super.initState();
@@ -194,9 +196,14 @@ class _LectureRecorderState extends State<LectureRecorder> {
       await imageFile.delete();
     }
     await concatFile.delete();
+
+    _flutterFFmpeg.cancel();
   }
 
   void _mergeAudioAndVideo() async {
+    setState(() {
+      _isMerging = true;
+    });
     await _generateVideoFromSlides();
 
     // Merge the video stream with the recorded audio
@@ -219,6 +226,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
       // Error
       print('Error merging video and audio: $returnCode');
     }
+    _flutterFFmpeg.cancel();
+    setState(() {
+      _isMerging = false;
+    });
   }
 
   @override
@@ -231,15 +242,18 @@ class _LectureRecorderState extends State<LectureRecorder> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                IconButton(
-                  onPressed: _isRecording ? _stopRecording : _startRecording,
-                  icon: Icon(_isRecording ? Icons.stop : Icons.mic),
-                ),
-              ],
-            ),
+            if (_isMerging)
+              CircularProgressIndicator()
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  IconButton(
+                    onPressed: _isRecording ? _stopRecording : _startRecording,
+                    icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+                  ),
+                ],
+              ),
             if (_pdfDocumentLoader != null)
               Expanded(
                 child: Center(

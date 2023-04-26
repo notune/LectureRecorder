@@ -10,6 +10,7 @@ import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:image/image.dart' as img;
+import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 
 void main() {
@@ -222,6 +223,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
       File audioFile = File(_audioPath);
       await videoFile.delete();
       await audioFile.delete();
+      //share the lecture video
+      Share.shareFiles([outputPath], text: 'Lecture video');
     } else {
       // Error
       print('Error merging video and audio: $returnCode');

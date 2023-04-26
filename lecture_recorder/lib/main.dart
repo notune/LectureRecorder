@@ -42,7 +42,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
   bool _recorderIsInited = false;
   bool _isRecording = false;
   String _audioPath = '';
-  List<int> _slideTimestamps = [];
+  List<dynamic> _slideTimestamps = [];
 
   @override
   void initState() {
@@ -74,8 +74,6 @@ class _LectureRecorderState extends State<LectureRecorder> {
     });
   }
 
-  int _recordingStartTime = 0;
-
   void _startRecording() async {
     if (!_recorderIsInited) return;
     Directory tempDir = await getTemporaryDirectory();
@@ -87,7 +85,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     );
     setState(() {
       _isRecording = true;
-      _slideTimestamps.add(DateTime.now().millisecondsSinceEpoch);
+      _slideTimestamps.add([true, DateTime.now().millisecondsSinceEpoch]);
     });
   }
 
@@ -151,12 +149,25 @@ class _LectureRecorderState extends State<LectureRecorder> {
     final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
 
     // Create a temporary file with the list of input files and durations
-    final concatFileContent = _slideTimestamps.asMap().entries.map((entry) {
-      int i = entry.key;
-      int duration = i < _slideTimestamps.length - 1
-          ? _slideTimestamps[i + 1] - _slideTimestamps[i]
-          : 5000; // Set a default duration for the last slide
-      return 'file ${slideImages[i].path}\nduration ${duration / 1000}';
+    List<int> slideIndices = [0];
+    List<int> slideDurations = [];
+
+    for (int i = 1; i < _slideTimestamps.length; i++) {
+      int duration = _slideTimestamps[i][1] - _slideTimestamps[i - 1][1];
+      slideDurations.add(duration);
+
+      if (_slideTimestamps[i][0]) {
+        // Forward button pressed
+        slideIndices.add(slideIndices.last + 1);
+      } else {
+        // Backward button pressed
+        slideIndices.add(slideIndices.last - 1);
+      }
+    }
+    slideDurations.add(5000); // Set a default duration for the last slide
+
+    final concatFileContent = List.generate(slideIndices.length, (i) {
+      return 'file ${slideImages[slideIndices[i]].path}\nduration ${slideDurations[i] / 1000}';
     }).join('\n');
     final concatFilePath = '${tempDir.path}/concat.txt';
     final concatFile = File(concatFilePath);
@@ -233,19 +244,22 @@ class _LectureRecorderState extends State<LectureRecorder> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 IconButton(
+                  //Backwards Button
                   onPressed: _currentPageIndex > 0
                       ? () {
                           setState(() {
                             _currentPageIndex--;
                           });
                           if (_isRecording) {
-                            _slideTimestamps.removeLast();
+                            _slideTimestamps.add(
+                                [false, DateTime.now().millisecondsSinceEpoch]);
                           }
                         }
                       : null,
                   icon: const Icon(Icons.arrow_back),
                 ),
                 IconButton(
+                  //Forward Button
                   onPressed: () {
                     // Implement a method to get the total number of pages in the PDF
                     // and use it to check if the _currentPageIndex is within the range.
@@ -254,7 +268,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
                     });
                     if (_isRecording) {
                       _slideTimestamps
-                          .add(DateTime.now().millisecondsSinceEpoch);
+                          .add([true, DateTime.now().millisecondsSinceEpoch]);
                     }
                   },
                   icon: const Icon(Icons.arrow_forward),

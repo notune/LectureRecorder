@@ -129,6 +129,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
     }
   }
 
+  Future<void> deleteCache(videoPath) async {
+    File videoFile = File(videoPath);
+    File audioFile = File(_audioPath);
+    if (await videoFile.exists()) await videoFile.delete();
+    if (await videoFile.exists()) await audioFile.delete();
+  }
+
   Future<void> _generateVideoFromSlides() async {
     if (_pdfDocument == null) return;
 
@@ -197,10 +204,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
       } else {
         final output = await session.getFailStackTrace();
         print('Error generating video from slides: $output');
-        File videoFile = File(videoPath);
-        File audioFile = File(_audioPath);
-        await videoFile.delete();
-        await audioFile.delete();
+        await deleteCache(videoPath);
       }
     });
 
@@ -223,7 +227,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     String outputPath = '${tempDir.path}/merged_output.mp4'; // Output file path
 
     File mergedFile = File(outputPath);
-    await mergedFile.delete();
+    if (await mergedFile.exists()) await mergedFile.delete();
 
     await FFmpegKit.execute(
             '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath')
@@ -233,18 +237,12 @@ class _LectureRecorderState extends State<LectureRecorder> {
       if (ReturnCode.isSuccess(returnCode)) {
         print('Merged video and audio successfully: $outputPath');
         //delete audio and video files
-        File videoFile = File(videoPath);
-        File audioFile = File(_audioPath);
-        await videoFile.delete();
-        await audioFile.delete();
+        deleteCache(videoPath);
         //share the lecture video
         Share.shareFiles([outputPath], text: 'Lecture video');
       } else {
         print('Error merging video: ${session.getOutput().toString()}');
-        File videoFile = File(videoPath);
-        File audioFile = File(_audioPath);
-        await videoFile.delete();
-        await audioFile.delete();
+        await deleteCache(videoPath);
       }
     });
 

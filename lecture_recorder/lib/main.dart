@@ -242,6 +242,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
     });
   }
 
+  int getPdfPageCount() {
+    if (_pdfDocument == null) {
+      return 0;
+    }
+    return _pdfDocument!.pageCount;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -258,9 +265,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  IconButton(
-                    onPressed: _isRecording ? _stopRecording : _startRecording,
-                    icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+                  Visibility(
+                    visible: _pdfDocumentLoader != null,
+                    child: IconButton(
+                      onPressed:
+                          _isRecording ? _stopRecording : _startRecording,
+                      icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+                    ),
                   ),
                 ],
               ),
@@ -278,7 +289,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
               children: [
                 IconButton(
                   //Backwards Button
-                  onPressed: _currentPageIndex > 0
+                  onPressed: _currentPageIndex > 0 && !_isMerging
                       ? () {
                           setState(() {
                             _currentPageIndex--;
@@ -293,17 +304,19 @@ class _LectureRecorderState extends State<LectureRecorder> {
                 ),
                 IconButton(
                   //Forward Button
-                  onPressed: () {
-                    // Implement a method to get the total number of pages in the PDF
-                    // and use it to check if the _currentPageIndex is within the range.
-                    setState(() {
-                      _currentPageIndex++;
-                    });
-                    if (_isRecording) {
-                      _slideTimestamps
-                          .add([true, DateTime.now().millisecondsSinceEpoch]);
-                    }
-                  },
+                  onPressed: !_isMerging &&
+                          _pdfDocument != null &&
+                          _currentPageIndex < getPdfPageCount()
+                      ? () {
+                          setState(() {
+                            _currentPageIndex++;
+                          });
+                          if (_isRecording) {
+                            _slideTimestamps.add(
+                                [true, DateTime.now().millisecondsSinceEpoch]);
+                          }
+                        }
+                      : null,
                   icon: const Icon(Icons.arrow_forward),
                 ),
               ],
@@ -311,12 +324,15 @@ class _LectureRecorderState extends State<LectureRecorder> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _selectPdfAndLoad();
-        },
-        tooltip: 'Select PDF',
-        child: const Icon(Icons.add),
+      floatingActionButton: Visibility(
+        visible: !_isMerging && !_isRecording,
+        child: FloatingActionButton(
+          onPressed: () {
+            _selectPdfAndLoad();
+          },
+          tooltip: 'Select PDF',
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -6,7 +7,7 @@ import 'package:pdf_render/pdf_render_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:image/image.dart' as img;
@@ -158,8 +159,6 @@ class _LectureRecorderState extends State<LectureRecorder> {
     final tempDir = await getTemporaryDirectory();
     final videoPath = '${tempDir.path}/video_slides.mp4';
 
-    final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
-
     // Create a temporary file with the list of input files and durations
     List<int> slideIndices = [_startSlide];
     List<int> slideDurations = [];
@@ -186,24 +185,24 @@ class _LectureRecorderState extends State<LectureRecorder> {
     await concatFile.writeAsString(concatFileContent);
 
     // Generate the video using the concat demuxer
-    int returnCode = await _flutterFFmpeg.execute(
-        '-f concat -safe 0 -i $concatFilePath -vsync vfr -pix_fmt yuv420p -y $videoPath');
+    await FFmpegKit.execute(
+            '-f concat -safe 0 -i $concatFilePath -vsync vfr -pix_fmt yuv420p -y $videoPath')
+        .then((session) async {
+      final returnCode = await session.getReturnCode();
 
-    if (returnCode == 0) {
-      // Success
-      print('Generated video from slides successfully: $videoPath');
-    } else {
-      // Error
-      print('Error generating video from slides: $returnCode');
-    }
+      if (ReturnCode.isSuccess(returnCode)) {
+        print('Generated video from slides successfully: $videoPath');
+      } else {
+        final output = await session.getFailStackTrace();
+        print('Error generating video from slides: $output');
+      }
+    });
 
     // Clean up temporary slide image files and concat file
     for (final imageFile in slideImages) {
       await imageFile.delete();
     }
     await concatFile.delete();
-
-    _flutterFFmpeg.cancel();
   }
 
   void _mergeAudioAndVideo() async {
@@ -213,28 +212,28 @@ class _LectureRecorderState extends State<LectureRecorder> {
     await _generateVideoFromSlides();
 
     // Merge the video stream with the recorded audio
-    final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
     Directory tempDir = await getTemporaryDirectory();
     String videoPath = '${tempDir.path}/video_slides.mp4';
     String outputPath = '${tempDir.path}/merged_output.mp4'; // Output file path
-    int returnCode = await _flutterFFmpeg.execute(
-        '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath');
+    await FFmpegKit.execute(
+            '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath')
+        .then((session) async {
+      final returnCode = await session.getReturnCode();
 
-    if (returnCode == 0) {
-      // Success
-      print('Merged video and audio successfully: $outputPath');
-      //delete audio and video files
-      File videoFile = File(videoPath);
-      File audioFile = File(_audioPath);
-      await videoFile.delete();
-      await audioFile.delete();
-      //share the lecture video
-      Share.shareFiles([outputPath], text: 'Lecture video');
-    } else {
-      // Error
-      print('Error merging video and audio: $returnCode');
-    }
-    _flutterFFmpeg.cancel();
+      if (ReturnCode.isSuccess(returnCode)) {
+        print('Merged video and audio successfully: $outputPath');
+        //delete audio and video files
+        File videoFile = File(videoPath);
+        File audioFile = File(_audioPath);
+        await videoFile.delete();
+        await audioFile.delete();
+        //share the lecture video
+        Share.shareFiles([outputPath], text: 'Lecture video');
+      } else {
+        print('Error merging video: ${session.getOutput().toString()}');
+      }
+    });
+
     //reset vars
     _isRecording = false;
     _slideTimestamps = [];

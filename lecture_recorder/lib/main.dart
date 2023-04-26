@@ -114,6 +114,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
       );
 
       if (result != null) {
+        _currentPageIndex = 0;
         File file = File(result.files.single.path!);
         final doc = await PdfDocument.openFile(file.path);
         setState(() {
@@ -306,7 +307,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
                   //Forward Button
                   onPressed: !_isMerging &&
                           _pdfDocument != null &&
-                          _currentPageIndex < getPdfPageCount()
+                          _currentPageIndex + 1 < getPdfPageCount()
                       ? () {
                           setState(() {
                             _currentPageIndex++;

@@ -43,6 +43,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
   bool _recorderIsInited = false;
   bool _isRecording = false;
   String _audioPath = '';
+  int _startSlide = 0;
   List<dynamic> _slideTimestamps = [];
 
   bool _isMerging = false;
@@ -88,7 +89,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
     );
     setState(() {
       _isRecording = true;
-      _slideTimestamps.add([true, DateTime.now().millisecondsSinceEpoch]);
+      _slideTimestamps = [
+        [null, DateTime.now().millisecondsSinceEpoch]
+      ];
+      _startSlide = _currentPageIndex;
     });
   }
 
@@ -156,7 +160,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
 
     // Create a temporary file with the list of input files and durations
-    List<int> slideIndices = [0];
+    List<int> slideIndices = [_startSlide];
     List<int> slideDurations = [];
 
     for (int i = 1; i < _slideTimestamps.length; i++) {
@@ -230,6 +234,9 @@ class _LectureRecorderState extends State<LectureRecorder> {
       print('Error merging video and audio: $returnCode');
     }
     _flutterFFmpeg.cancel();
+    //reset vars
+    _isRecording = false;
+    _slideTimestamps = [];
     setState(() {
       _isMerging = false;
     });

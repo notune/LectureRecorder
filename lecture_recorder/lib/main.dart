@@ -127,7 +127,11 @@ class _LectureRecorderState extends State<LectureRecorder> {
     // Convert PDF pages to images
     for (int i = 0; i < _pdfDocument!.pageCount; i++) {
       final page = await _pdfDocument!.getPage(i + 1);
-      final pdfImage = await page.render();
+      final aspectRatio = page.width / page.height;
+      final targetHeight = 720;
+      final targetWidth = (aspectRatio * targetHeight).round();
+      final pdfImage =
+          await page.render(width: targetWidth, height: targetHeight);
       final image = img.Image.fromBytes(
         pdfImage.width,
         pdfImage.height,
@@ -206,6 +210,11 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (returnCode == 0) {
       // Success
       print('Merged video and audio successfully: $outputPath');
+      //delete audio and video files
+      File videoFile = File(videoPath);
+      File audioFile = File(_audioPath);
+      await videoFile.delete();
+      await audioFile.delete();
     } else {
       // Error
       print('Error merging video and audio: $returnCode');

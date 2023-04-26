@@ -102,6 +102,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     await _audioRecorder!.stopRecorder();
     setState(() {
       _isRecording = false;
+      _slideTimestamps.add([null, DateTime.now().millisecondsSinceEpoch]);
     });
     // Merge audio and video after stopping the recording
     _mergeAudioAndVideo();
@@ -163,7 +164,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     List<int> slideIndices = [_startSlide];
     List<int> slideDurations = [];
 
-    for (int i = 1; i < _slideTimestamps.length; i++) {
+    for (int i = 1; i < _slideTimestamps.length - 1; i++) {
       int duration = _slideTimestamps[i][1] - _slideTimestamps[i - 1][1];
       slideDurations.add(duration);
 
@@ -175,7 +176,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
         slideIndices.add(slideIndices.last - 1);
       }
     }
-    slideDurations.add(5000); // Set a default duration for the last slide
+    slideDurations.add(
+        _slideTimestamps.last[1]); //get time when the recording was stopped
 
     final concatFileContent = List.generate(slideIndices.length, (i) {
       return 'file ${slideImages[slideIndices[i]].path}\nduration ${slideDurations[i] / 1000}';
@@ -195,6 +197,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
       } else {
         final output = await session.getFailStackTrace();
         print('Error generating video from slides: $output');
+        File videoFile = File(videoPath);
+        File audioFile = File(_audioPath);
+        await videoFile.delete();
+        await audioFile.delete();
       }
     });
 
@@ -215,6 +221,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
     Directory tempDir = await getTemporaryDirectory();
     String videoPath = '${tempDir.path}/video_slides.mp4';
     String outputPath = '${tempDir.path}/merged_output.mp4'; // Output file path
+
+    File mergedFile = File(outputPath);
+    await mergedFile.delete();
+
     await FFmpegKit.execute(
             '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath')
         .then((session) async {
@@ -231,6 +241,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
         Share.shareFiles([outputPath], text: 'Lecture video');
       } else {
         print('Error merging video: ${session.getOutput().toString()}');
+        File videoFile = File(videoPath);
+        File audioFile = File(_audioPath);
+        await videoFile.delete();
+        await audioFile.delete();
       }
     });
 

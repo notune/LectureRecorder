@@ -12,8 +12,6 @@ The App keeps track of which slides you go to while recording the audio to later
 
 Flutter SDK 2.19.6 or later
 
-### Building
-
 ```
 git clone https://github.com/dravolin/LectureRecorder.git
 cd LectureRecorder/lecture_recorder

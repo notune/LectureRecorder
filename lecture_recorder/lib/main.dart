@@ -17,6 +17,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:async';
 import 'lecture_history.dart';
+import 'settings.dart';
 
 void main() {
   runApp(const MyApp());
@@ -340,6 +341,15 @@ class _LectureRecorderState extends State<LectureRecorder> {
       appBar: AppBar(
         title: const Text('Lecture Recorder'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Settings()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {

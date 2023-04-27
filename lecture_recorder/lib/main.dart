@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:async';
+import 'lecture_history.dart';
 
 void main() {
   runApp(const MyApp());
@@ -338,6 +339,17 @@ class _LectureRecorderState extends State<LectureRecorder> {
       key: _scaffoldKey,
       appBar: AppBar(
         title: const Text('Lecture Recorder'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LectureHistory()),
+              );
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Column(
@@ -376,37 +388,58 @@ class _LectureRecorderState extends State<LectureRecorder> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                IconButton(
-                  //Backwards Button
-                  onPressed: _currentPageIndex > 0 && !_isMerging
-                      ? () {
-                          setState(() {
-                            _currentPageIndex--;
-                          });
-                          if (_isRecording) {
-                            _slideTimestamps.add(
-                                [false, DateTime.now().millisecondsSinceEpoch]);
+                if (_pdfDocumentLoader == null)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Add a PDF using the "+" button to get started',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  )
+                else
+                  Visibility(
+                    visible: _pdfDocumentLoader != null,
+                    child: IconButton(
+                      //Backwards Button
+                      onPressed: _currentPageIndex > 0 && !_isMerging
+                          ? () {
+                              setState(() {
+                                _currentPageIndex--;
+                              });
+                              if (_isRecording) {
+                                _slideTimestamps.add([
+                                  false,
+                                  DateTime.now().millisecondsSinceEpoch
+                                ]);
+                              }
+                            }
+                          : null,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                  ),
+                Visibility(
+                  visible: _pdfDocumentLoader != null,
+                  child: IconButton(
+                    //Forward Button
+                    onPressed: !_isMerging &&
+                            _pdfDocument != null &&
+                            _currentPageIndex + 1 < getPdfPageCount()
+                        ? () {
+                            setState(() {
+                              _currentPageIndex++;
+                            });
+                            if (_isRecording) {
+                              _slideTimestamps.add([
+                                true,
+                                DateTime.now().millisecondsSinceEpoch
+                              ]);
+                            }
                           }
-                        }
-                      : null,
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                IconButton(
-                  //Forward Button
-                  onPressed: !_isMerging &&
-                          _pdfDocument != null &&
-                          _currentPageIndex + 1 < getPdfPageCount()
-                      ? () {
-                          setState(() {
-                            _currentPageIndex++;
-                          });
-                          if (_isRecording) {
-                            _slideTimestamps.add(
-                                [true, DateTime.now().millisecondsSinceEpoch]);
-                          }
-                        }
-                      : null,
-                  icon: const Icon(Icons.arrow_forward),
+                        : null,
+                    icon: const Icon(Icons.arrow_forward),
+                  ),
                 ),
               ],
             ),

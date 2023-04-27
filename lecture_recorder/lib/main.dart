@@ -14,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:async';
 import 'lecture_history.dart';
@@ -32,6 +33,17 @@ class MyApp extends StatelessWidget {
       home: const LectureRecorder(),
     );
   }
+}
+
+Future<Map<String, dynamic>> getSettings() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  int videoQuality = prefs.getInt('videoQuality') ?? 720;
+  bool wakelockWhileRecording = prefs.getBool('wakelockWhileRecording') ?? true;
+
+  return {
+    'videoQuality': videoQuality,
+    'wakelockWhileRecording': wakelockWhileRecording,
+  };
 }
 
 class LectureRecorder extends StatefulWidget {
@@ -59,6 +71,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
   Timer? _timer;
 
   bool _isMerging = false;
+
+  bool _wakelockWhileRecording = true;
+
+  int _videoQuality = 720;
 
   @override
   void initState() {
@@ -94,7 +110,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (!_recorderIsInited) return;
     _stopwatch.reset();
     _stopwatch.start();
-    Wakelock.enable();
+
+    Map<String, dynamic> settings = await getSettings();
+    _videoQuality = settings['videoQuality'];
+    _wakelockWhileRecording = settings['wakelockWhileRecording'];
+
+    if (_wakelockWhileRecording) Wakelock.enable();
+
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {});
     });
@@ -126,7 +148,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
     });
     // Merge audio and video after stopping the recording
     _mergeAudioAndVideo();
-    Wakelock.disable();
+
+    if (_wakelockWhileRecording) Wakelock.disable();
   }
 
   Future<void> _selectPdfAndLoad() async {
@@ -166,7 +189,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     for (int i = 0; i < _pdfDocument!.pageCount; i++) {
       final page = await _pdfDocument!.getPage(i + 1);
       final aspectRatio = page.width / page.height;
-      final targetHeight = 720;
+      final targetHeight = _videoQuality;
       final targetWidth = (aspectRatio * targetHeight).round();
       final pdfImage =
           await page.render(width: targetWidth, height: targetHeight);

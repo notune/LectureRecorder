@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,7 +11,7 @@ class Settings extends StatefulWidget {
 }
 
 class _SettingsState extends State<Settings> {
-  String _videoQuality = 'medium';
+  int _videoQuality = 720;
   bool _wakelockWhileRecording = true;
 
   @override
@@ -20,14 +22,14 @@ class _SettingsState extends State<Settings> {
 
   Future<void> _saveSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('videoQuality', _videoQuality);
+    await prefs.setInt('videoQuality', _videoQuality);
     await prefs.setBool('wakelockWhileRecording', _wakelockWhileRecording);
   }
 
   Future<void> _loadSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _videoQuality = prefs.getString('videoQuality') ?? 'medium';
+      _videoQuality = prefs.getInt('videoQuality') ?? 720;
       _wakelockWhileRecording = prefs.getBool('wakelockWhileRecording') ?? true;
     });
   }
@@ -42,14 +44,17 @@ class _SettingsState extends State<Settings> {
         children: [
           ListTile(
             title: const Text('Video Quality'),
-            trailing: DropdownButton<String>(
+            trailing: DropdownButton<int>(
               value: _videoQuality,
               items: [
-                DropdownMenuItem(child: Text('Low (480h)'), value: 'low'),
-                DropdownMenuItem(child: Text('Medium (720h)'), value: 'medium'),
-                DropdownMenuItem(child: Text('High (1080h)'), value: 'high'),
+                DropdownMenuItem<int>(
+                    child: const Text('Low (480h)'), value: 480),
+                DropdownMenuItem<int>(
+                    child: const Text('Medium (720h)'), value: 720),
+                DropdownMenuItem<int>(
+                    child: const Text('High (1080h)'), value: 1080),
               ],
-              onChanged: (String? newValue) {
+              onChanged: (int? newValue) {
                 setState(() {
                   _videoQuality = newValue!;
                 });

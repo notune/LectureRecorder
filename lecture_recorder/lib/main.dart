@@ -13,6 +13,7 @@ import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:async';
 
@@ -89,6 +90,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
   void _startRecording() async {
     if (!_recorderIsInited) return;
+    _stopwatch.reset();
     _stopwatch.start();
     Wakelock.enable();
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -253,7 +255,12 @@ class _LectureRecorderState extends State<LectureRecorder> {
     // Merge the video stream with the recorded audio
     Directory tempDir = await getTemporaryDirectory();
     String videoPath = '${tempDir.path}/video_slides.mp4';
-    String outputPath = '${tempDir.path}/merged_output.mp4'; // Output file path
+
+    DateTime now = DateTime.now();
+    String formattedDate = DateFormat('yyMMddHH').format(now);
+    Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+    String lectureFile = 'lecture_$formattedDate.mp4';
+    String outputPath = '${appDocumentsDir.path}/$lectureFile';
 
     File mergedFile = File(outputPath);
     if (await mergedFile.exists()) await mergedFile.delete();
@@ -268,7 +275,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
         //delete audio and video files
         deleteCache(videoPath);
         //share the lecture video
-        Share.shareFiles([outputPath], text: 'Lecture video');
+        await Share.shareFiles([outputPath], text: 'Lecture video');
+        //delete share cache
+        File shareCache = File('shareplus/$lectureFile');
+        shareCache.delete();
       } else {
         var output = await session.getFailStackTrace();
         print('Error merging video: $output');

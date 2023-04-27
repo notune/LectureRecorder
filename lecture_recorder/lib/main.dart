@@ -12,6 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
+import 'package:wakelock/wakelock.dart';
 import 'dart:io';
 import 'dart:async';
 
@@ -87,6 +88,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
   void _startRecording() async {
     if (!_recorderIsInited) return;
     _stopwatch.start();
+    Wakelock.enable();
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {});
     });
@@ -118,6 +120,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     });
     // Merge audio and video after stopping the recording
     _mergeAudioAndVideo();
+    Wakelock.disable();
   }
 
   Future<void> _selectPdfAndLoad() async {

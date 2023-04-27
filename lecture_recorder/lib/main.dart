@@ -151,8 +151,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (await videoFile.exists()) await audioFile.delete();
   }
 
-  Future<void> _generateVideoFromSlides() async {
-    if (_pdfDocument == null) return;
+  Future<bool> _generateVideoFromSlides() async {
+    if (_pdfDocument == null) return false;
 
     List<File> slideImages = [];
 
@@ -209,6 +209,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     await concatFile.writeAsString(concatFileContent);
 
     // Generate the video using the concat demuxer
+    bool isSuccess = false;
     await FFmpegKit.execute(
             '-f concat -safe 0 -i $concatFilePath -vsync vfr -pix_fmt yuv420p -y $videoPath')
         .then((session) async {
@@ -216,8 +217,9 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
       if (ReturnCode.isSuccess(returnCode)) {
         print('Generated video from slides successfully: $videoPath');
+        isSuccess = true;
       } else {
-        final output = await session.getFailStackTrace();
+        var output = await session.getFailStackTrace();
         print('Error generating video from slides: $output');
         await deleteCache(videoPath);
       }
@@ -228,13 +230,22 @@ class _LectureRecorderState extends State<LectureRecorder> {
       await imageFile.delete();
     }
     await concatFile.delete();
+
+    return isSuccess;
   }
 
   void _mergeAudioAndVideo() async {
     setState(() {
       _isMerging = true;
     });
-    await _generateVideoFromSlides();
+    bool isVideoGenerated = await _generateVideoFromSlides();
+    if (!isVideoGenerated) {
+      print('Failed to generate video from slides, aborting merge');
+      setState(() {
+        _isMerging = false;
+      });
+      return;
+    }
 
     // Merge the video stream with the recorded audio
     Directory tempDir = await getTemporaryDirectory();
@@ -256,7 +267,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
         //share the lecture video
         Share.shareFiles([outputPath], text: 'Lecture video');
       } else {
-        print('Error merging video: ${session.getOutput().toString()}');
+        var output = await session.getFailStackTrace();
+        print('Error merging video: $output');
         await deleteCache(videoPath);
       }
     });

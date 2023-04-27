@@ -13,6 +13,7 @@ import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform
 import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -46,6 +47,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
   String _audioPath = '';
   int _startSlide = 0;
   List<dynamic> _slideTimestamps = [];
+  late DateTime _startTime;
+  late String _elapsedTime;
+  final _stopwatch = Stopwatch();
+  Timer? _timer;
 
   bool _isMerging = false;
 
@@ -81,6 +86,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
   void _startRecording() async {
     if (!_recorderIsInited) return;
+    _stopwatch.start();
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {});
+    });
     Directory tempDir = await getTemporaryDirectory();
     _audioPath = '${tempDir.path}/audio_record.mp4';
     await _audioRecorder!.startRecorder(
@@ -94,11 +103,14 @@ class _LectureRecorderState extends State<LectureRecorder> {
         [null, DateTime.now().millisecondsSinceEpoch]
       ];
       _startSlide = _currentPageIndex;
+      _startTime = DateTime.now();
     });
   }
 
   void _stopRecording() async {
     if (!_isRecording) return;
+    _stopwatch.stop();
+    _timer?.cancel();
     await _audioRecorder!.stopRecorder();
     setState(() {
       _isRecording = false;
@@ -285,6 +297,11 @@ class _LectureRecorderState extends State<LectureRecorder> {
                       icon: Icon(_isRecording ? Icons.stop : Icons.mic),
                     ),
                   ),
+                  if (_isRecording)
+                    Text(
+                      '${_stopwatch.elapsed.inHours.toString().padLeft(2, '0')}:${_stopwatch.elapsed.inMinutes.remainder(60).toString().padLeft(2, '0')}:${_stopwatch.elapsed.inSeconds.remainder(60).toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 16),
+                    ),
                 ],
               ),
             if (_pdfDocumentLoader != null)

@@ -5,7 +5,6 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:video_player/video_player.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:file_picker/file_picker.dart';
@@ -13,6 +12,7 @@ import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform
 import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
 import 'package:wakelock/wakelock.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:async';
 
@@ -51,6 +51,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
   late DateTime _startTime;
   late String _elapsedTime;
   final _stopwatch = Stopwatch();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   Timer? _timer;
 
   bool _isMerging = false;
@@ -222,6 +224,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
         var output = await session.getFailStackTrace();
         print('Error generating video from slides: $output');
         await deleteCache(videoPath);
+        _showErrorDialog('Error generating video from slides: $output');
       }
     });
 
@@ -270,6 +273,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
         var output = await session.getFailStackTrace();
         print('Error merging video: $output');
         await deleteCache(videoPath);
+        _showErrorDialog('Error merging video: $output');
       }
     });
 
@@ -288,9 +292,43 @@ class _LectureRecorderState extends State<LectureRecorder> {
     return _pdfDocument!.pageCount;
   }
 
+  void _showErrorDialog(String errorMessage) {
+    BuildContext context = _scaffoldKey.currentContext!;
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Error Occurred'),
+          content: Text(errorMessage),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Copy Error Message'),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: errorMessage));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error message copied to clipboard'),
+                  ),
+                );
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text('Lecture Recorder'),
       ),

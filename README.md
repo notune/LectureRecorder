@@ -1,6 +1,6 @@
 # Lecture Recorder
 
-Lecture Recorder is a cross-platform app that allows you to record lectures using your mobile device. The app records audio via the built-in microphone and synchronizes it with the linked slides, creating a video file for future reference. The app has been tested and is compatible with Android and iOS. Note that the web app is currently not functional.
+Lecture Recorder is a cross-platform app that allows you to record lectures using your mobile device. The app records audio via the built-in microphone and synchronizes it with the linked slides, creating a video file for future reference. The app has been tested and is compatible with Android and iOS.
 
 ## How it works
 

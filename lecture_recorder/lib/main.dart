@@ -108,8 +108,16 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
     // Request microphone permission
     if (!kIsWeb) {
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
+      var status = await Permission.microphone.status;
+      if (status.isDenied ||
+          status.isRestricted ||
+          status.isPermanentlyDenied) {
+        status = await Permission.microphone.request();
+      }
+
+      if (status.isDenied ||
+          status.isRestricted ||
+          status.isPermanentlyDenied) {
         throw RecordingPermissionException('Microphone permission not granted');
       }
     }

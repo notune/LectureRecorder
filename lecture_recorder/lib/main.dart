@@ -104,8 +104,6 @@ class _LectureRecorderState extends State<LectureRecorder> {
   }
 
   Future<void> _initAudioRecorder() async {
-    _audioRecorder = FlutterSoundRecorder();
-
     // Request microphone permission
     if (!kIsWeb) {
       var status = await Permission.microphone.request();
@@ -113,6 +111,8 @@ class _LectureRecorderState extends State<LectureRecorder> {
         throw RecordingPermissionException('Microphone permission not granted');
       }
     }
+
+    _audioRecorder = FlutterSoundRecorder();
 
     // Initialize the recorder
     await _audioRecorder!.openRecorder();

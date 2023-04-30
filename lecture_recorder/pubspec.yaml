@@ -37,6 +37,7 @@ dependencies:
   ffmpeg_kit_flutter: ^5.1.0
   flutter_sound: ^9.2.13
   image: ^3.0.2
+  # image: ^4.0.15
   share_plus: ^6.3.3
   wakelock: ^0.6.2
   intl: ^0.18.1
@@ -67,6 +68,7 @@ dev_dependencies:
 #   ios: true
 #   remove_alpha_ios: true
 #   image_path: "assets/icon/icon.png"
+#   image_path_ios: "assets/icon/icon_ios.png"
 #   min_sdk_android: 26
 
 # For information on the generic Dart part of this file, see the

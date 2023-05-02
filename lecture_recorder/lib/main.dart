@@ -16,6 +16,7 @@
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:record/record.dart';
 import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
@@ -67,7 +68,8 @@ class LectureRecorder extends StatefulWidget {
   _LectureRecorderState createState() => _LectureRecorderState();
 }
 
-class _LectureRecorderState extends State<LectureRecorder> {
+class _LectureRecorderState extends State<LectureRecorder>
+    with WidgetsBindingObserver {
   PdfDocumentLoader? _pdfDocumentLoader;
   PdfDocument? _pdfDocument;
   int _currentPageIndex = 0;
@@ -81,6 +83,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
   late String _elapsedTime;
   final _stopwatch = Stopwatch();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  //ios specific vars to make sure no video gets recorded when the app is in the background
+  int _pauseRecordingTimestamp = 0;
+  int _resumeRecordingTimestamp = 0;
+  int _totalPausedDuration = 0;
 
   Timer? _timer;
 
@@ -94,11 +100,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
   void initState() {
     super.initState();
     _initAudioRecorder();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     _audioRecorder?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -227,7 +235,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
     for (int i = 1; i < _slideTimestamps.length - 1; i++) {
       int duration = _slideTimestamps[i][1] - _slideTimestamps[i - 1][1];
-      slideDurations.add(duration);
+
+      // Only adjust the duration on iOS devices (because no audio in background gets recorded)
+      if (Platform.isIOS) {
+        slideDurations.add(duration - _totalPausedDuration);
+      } else {
+        slideDurations.add(duration);
+      }
 
       if (_slideTimestamps[i][0]) {
         // Forward button pressed
@@ -237,8 +251,13 @@ class _LectureRecorderState extends State<LectureRecorder> {
         slideIndices.add(slideIndices.last - 1);
       }
     }
-    slideDurations.add(
-        _slideTimestamps.last[1]); //get time when the recording was stopped
+    // Only adjust the last slide duration on iOS devices
+    if (Platform.isIOS) {
+      slideDurations.add(_slideTimestamps.last[1] -
+          _totalPausedDuration); //get time when the recording was stopped
+    } else {
+      slideDurations.add(_slideTimestamps.last[1]);
+    }
 
     final concatFileContent = List.generate(slideIndices.length, (i) {
       return 'file ${slideImages[slideIndices[i]].path}\nduration ${slideDurations[i] / 1000}';
@@ -322,6 +341,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     //reset vars
     _isRecording = false;
     _slideTimestamps = [];
+    _totalPausedDuration = 0;
     setState(() {
       _isMerging = false;
     });

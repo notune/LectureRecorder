@@ -110,6 +110,20 @@ class _LectureRecorderState extends State<LectureRecorder>
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (Platform.isIOS) {
+      if (state == AppLifecycleState.paused && _isRecording) {
+        _pauseRecordingTimestamp = DateTime.now().millisecondsSinceEpoch;
+      } else if (state == AppLifecycleState.resumed && _isRecording) {
+        _resumeRecordingTimestamp = DateTime.now().millisecondsSinceEpoch;
+        _totalPausedDuration +=
+            _resumeRecordingTimestamp - _pauseRecordingTimestamp;
+      }
+    }
+  }
+
   Future<void> _initAudioRecorder() async {
     _audioRecorder = Record();
 

@@ -144,7 +144,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
       setState(() {});
     });
     Directory tempDir = await getTemporaryDirectory();
-    _audioPath = '${tempDir.path}/audio_record.mp4';
+    _audioPath = '${tempDir.path}/audio_record.aac';
     await _audioRecorder!.startRecorder(
       toFile: _audioPath,
       codec: Codec.aacMP4,
@@ -314,7 +314,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (await mergedFile.exists()) await mergedFile.delete();
 
     await FFmpegKit.execute(
-            '-i $videoPath -i $_audioPath -c copy -map 0:v:0 -map 1:a:0 $outputPath')
+            '-i $videoPath -i $_audioPath -c:v copy -c:a aac $outputPath')
         .then((session) async {
       final returnCode = await session.getReturnCode();
 

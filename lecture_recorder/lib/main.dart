@@ -16,14 +16,13 @@
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_sound/flutter_sound.dart';
+import 'package:record/record.dart';
 import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
 import 'package:wakelock/wakelock.dart';
@@ -72,7 +71,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
   PdfDocumentLoader? _pdfDocumentLoader;
   PdfDocument? _pdfDocument;
   int _currentPageIndex = 0;
-  FlutterSoundRecorder? _audioRecorder;
+  Record? _audioRecorder;
   bool _recorderIsInited = false;
   bool _isRecording = false;
   String _audioPath = '';
@@ -99,31 +98,20 @@ class _LectureRecorderState extends State<LectureRecorder> {
 
   @override
   void dispose() {
-    _audioRecorder?.closeRecorder();
+    _audioRecorder?.dispose();
     super.dispose();
   }
 
   Future<void> _initAudioRecorder() async {
-    _audioRecorder = FlutterSoundRecorder();
+    _audioRecorder = Record();
 
     // Request microphone permission
     if (!kIsWeb) {
-      var status = await Permission.microphone.status;
-      if (status.isDenied ||
-          status.isRestricted ||
-          status.isPermanentlyDenied) {
-        status = await Permission.microphone.request();
-      }
-
-      if (status.isDenied ||
-          status.isRestricted ||
-          status.isPermanentlyDenied) {
-        throw RecordingPermissionException('Microphone permission not granted');
+      var status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        throw Exception('Microphone permission not granted');
       }
     }
-
-    // Initialize the recorder
-    await _audioRecorder!.openRecorder();
     setState(() {
       _recorderIsInited = true;
     });
@@ -144,11 +132,10 @@ class _LectureRecorderState extends State<LectureRecorder> {
       setState(() {});
     });
     Directory tempDir = await getTemporaryDirectory();
-    _audioPath = '${tempDir.path}/audio_record.aac';
-    await _audioRecorder!.startRecorder(
-      toFile: _audioPath,
-      codec: Codec.aacMP4,
-      audioSource: AudioSource.microphone,
+    _audioPath = '${tempDir.path}/audio_record.m4a';
+    await _audioRecorder!.start(
+      path: _audioPath,
+      encoder: AudioEncoder.aacLc,
     );
     setState(() {
       _isRecording = true;
@@ -164,7 +151,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
     if (!_isRecording) return;
     _stopwatch.stop();
     _timer?.cancel();
-    await _audioRecorder!.stopRecorder();
+    await _audioRecorder!.stop();
     setState(() {
       _isRecording = false;
       _slideTimestamps.add([null, DateTime.now().millisecondsSinceEpoch]);

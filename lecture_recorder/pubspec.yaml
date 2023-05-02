@@ -35,7 +35,7 @@ dependencies:
   video_player: ^2.6.1
   permission_handler: ^10.2.0
   ffmpeg_kit_flutter: ^5.1.0
-  flutter_sound: ^9.2.13
+  record: ^4.4.4
   image: ^3.0.2
   # image: ^4.0.15
   share_plus: ^6.3.3

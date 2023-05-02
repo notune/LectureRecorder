@@ -310,7 +310,7 @@ class _LectureRecorderState extends State<LectureRecorder> {
         //delete audio and video files
         deleteCache(videoPath);
         //share the lecture video
-        await Share.shareFiles([outputPath], text: 'Lecture video');
+        await Share.shareFiles([outputPath]);
       } else {
         var output = await session.getFailStackTrace();
         print('Error merging video: $output');

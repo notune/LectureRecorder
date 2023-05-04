@@ -83,7 +83,7 @@ class _LectureRecorderState extends State<LectureRecorder>
   final _stopwatch = Stopwatch();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<List<int>> _backgroundDurations = [];
-  final _backgroundStopwatch = Stopwatch();
+  DateTime? _backgroundStartTime;
 
   Timer? _timer;
 
@@ -118,15 +118,17 @@ class _LectureRecorderState extends State<LectureRecorder>
       if (state == AppLifecycleState.paused) {
         // App goes into the background
         _audioRecorder?.pause();
-        _backgroundStopwatch.start();
+        _backgroundStartTime = DateTime.now();
         _stopwatch.stop();
       } else if (state == AppLifecycleState.resumed) {
         // App comes back to the foreground
         _audioRecorder?.resume();
-        _backgroundStopwatch.stop();
-        _backgroundDurations
-            .add([_currentPageIndex, _backgroundStopwatch.elapsedMilliseconds]);
-        _backgroundStopwatch.reset();
+        if (_backgroundStartTime != null) {
+          int backgroundDuration =
+              DateTime.now().difference(_backgroundStartTime!).inMilliseconds;
+          _backgroundDurations.add([_currentPageIndex, backgroundDuration]);
+          _backgroundStartTime = null;
+        }
         _stopwatch.start();
       }
     }

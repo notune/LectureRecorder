@@ -16,7 +16,6 @@
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:record/record.dart';
 import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
@@ -83,10 +82,8 @@ class _LectureRecorderState extends State<LectureRecorder>
   late String _elapsedTime;
   final _stopwatch = Stopwatch();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  //ios specific vars to make sure no video gets recorded when the app is in the background
-  int _pauseRecordingTimestamp = 0;
-  int _resumeRecordingTimestamp = 0;
-  int _totalPausedDuration = 0;
+  List<List<int>> _backgroundDurations = [];
+  final _backgroundStopwatch = Stopwatch();
 
   Timer? _timer;
 
@@ -99,27 +96,38 @@ class _LectureRecorderState extends State<LectureRecorder>
   @override
   void initState() {
     super.initState();
+    if (Platform.isIOS) {
+      WidgetsBinding.instance.addObserver(this);
+    }
     _initAudioRecorder();
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    if (Platform.isIOS) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     _audioRecorder?.dispose();
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (Platform.isIOS) {
-      if (state == AppLifecycleState.paused && _isRecording) {
-        _pauseRecordingTimestamp = DateTime.now().millisecondsSinceEpoch;
-      } else if (state == AppLifecycleState.resumed && _isRecording) {
-        _resumeRecordingTimestamp = DateTime.now().millisecondsSinceEpoch;
-        _totalPausedDuration +=
-            _resumeRecordingTimestamp - _pauseRecordingTimestamp;
+    if (_isRecording && Platform.isIOS) {
+      if (state == AppLifecycleState.paused) {
+        // App goes into the background
+        _audioRecorder?.pause();
+        _backgroundStopwatch.start();
+        _stopwatch.stop();
+      } else if (state == AppLifecycleState.resumed) {
+        // App comes back to the foreground
+        _audioRecorder?.resume();
+        _backgroundStopwatch.stop();
+        _backgroundDurations
+            .add([_currentPageIndex, _backgroundStopwatch.elapsedMilliseconds]);
+        _backgroundStopwatch.reset();
+        _stopwatch.start();
       }
     }
   }
@@ -249,13 +257,7 @@ class _LectureRecorderState extends State<LectureRecorder>
 
     for (int i = 1; i < _slideTimestamps.length - 1; i++) {
       int duration = _slideTimestamps[i][1] - _slideTimestamps[i - 1][1];
-
-      // Only adjust the duration on iOS devices (because no audio in background gets recorded)
-      if (Platform.isIOS) {
-        slideDurations.add(duration - _totalPausedDuration);
-      } else {
-        slideDurations.add(duration);
-      }
+      slideDurations.add(duration);
 
       if (_slideTimestamps[i][0]) {
         // Forward button pressed
@@ -265,12 +267,17 @@ class _LectureRecorderState extends State<LectureRecorder>
         slideIndices.add(slideIndices.last - 1);
       }
     }
-    // Only adjust the last slide duration on iOS devices
+    slideDurations.add(
+        _slideTimestamps.last[1]); //get time when the recording was stopped
+
     if (Platform.isIOS) {
-      slideDurations.add(_slideTimestamps.last[1] -
-          _totalPausedDuration); //get time when the recording was stopped
-    } else {
-      slideDurations.add(_slideTimestamps.last[1]);
+      // Subtract background durations from slideDurations
+      for (final entry in _backgroundDurations) {
+        int slideIndex = slideIndices.indexOf(entry[0]);
+        if (slideIndex != -1) {
+          slideDurations[slideIndex] -= entry[1];
+        }
+      }
     }
 
     final concatFileContent = List.generate(slideIndices.length, (i) {
@@ -355,7 +362,6 @@ class _LectureRecorderState extends State<LectureRecorder>
     //reset vars
     _isRecording = false;
     _slideTimestamps = [];
-    _totalPausedDuration = 0;
     setState(() {
       _isMerging = false;
     });

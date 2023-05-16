@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +84,7 @@ class _LectureRecorderState extends State<LectureRecorder>
   int _lastTimestamp = 0;
   bool wasInBackground = false;
   int backgroundDuration = 0;
+  double _mergeProgress = 0.0;
 
   Timer? _timer;
 
@@ -285,6 +287,16 @@ class _LectureRecorderState extends State<LectureRecorder>
   }
 
   void _mergeAudioAndVideo() async {
+    FFmpegKitConfig.enableStatisticsCallback((statistics) {
+      double timeInSec = statistics.getTime() / 1000;
+      double totalTimeInSec = _stopwatch.elapsed.inSeconds.toDouble();
+      if (totalTimeInSec == 0) return;
+      double progress = (timeInSec / totalTimeInSec);
+      setState(() {
+        _mergeProgress = progress;
+      });
+    });
+
     setState(() {
       _isMerging = true;
     });
@@ -420,7 +432,28 @@ class _LectureRecorderState extends State<LectureRecorder>
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             if (_isMerging)
-              CircularProgressIndicator()
+              SizedBox(
+                height: 80,
+                width: 80,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: <Widget>[
+                    _mergeProgress > 0
+                        ? CircularProgressIndicator(
+                            value: _mergeProgress,
+                          )
+                        : CircularProgressIndicator(),
+                    if (_mergeProgress > 0)
+                      Text(
+                        '${(_mergeProgress * 100).round()}%',
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          color: Colors.black,
+                        ),
+                      ),
+                  ],
+                ),
+              )
             else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,

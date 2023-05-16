@@ -186,6 +186,7 @@ class _LectureRecorderState extends State<LectureRecorder>
     setState(() {
       _isRecording = false;
       trackSlideDuration();
+      _mergeProgress = 0.0;
     });
     // Merge audio and video after stopping the recording
     _mergeAudioAndVideo();
@@ -287,13 +288,22 @@ class _LectureRecorderState extends State<LectureRecorder>
   }
 
   void _mergeAudioAndVideo() async {
+    bool isFirstCommand =
+        true; // Add a flag to check which command is being executed to calc the progress
+    double totalProgress = 0.0;
+
     FFmpegKitConfig.enableStatisticsCallback((statistics) {
       double timeInSec = statistics.getTime() / 1000;
       double totalTimeInSec = _stopwatch.elapsed.inSeconds.toDouble();
       if (totalTimeInSec == 0) return;
-      double progress = (timeInSec / totalTimeInSec);
+      double progress = (timeInSec / totalTimeInSec).clamp(0, 1);
+      if (isFirstCommand) {
+        totalProgress = progress * 0.5;
+      } else {
+        totalProgress = 0.5 + progress * 0.5;
+      }
       setState(() {
-        _mergeProgress = progress;
+        _mergeProgress = totalProgress;
       });
     });
 
@@ -321,6 +331,8 @@ class _LectureRecorderState extends State<LectureRecorder>
 
     File mergedFile = File(outputPath);
     if (await mergedFile.exists()) await mergedFile.delete();
+
+    isFirstCommand = false; // Update the flag before the second command
 
     await FFmpegKit.execute(
             '-i $videoPath -i $_audioPath -c:v copy -c:a aac $outputPath')

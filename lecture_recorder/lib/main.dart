@@ -43,8 +43,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: const LectureRecorder(),
+    return const MaterialApp(
+      home: LectureRecorder(),
     );
   }
 }
@@ -76,14 +76,13 @@ class _LectureRecorderState extends State<LectureRecorder>
   bool _recorderIsInited = false;
   bool _isRecording = false;
   String _audioPath = '';
-  int _startSlide = 0;
-  List<dynamic> _slideTimestamps = [];
-  late DateTime _startTime;
-  late String _elapsedTime;
   final _stopwatch = Stopwatch();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  List<List<int>> _backgroundDurations = [];
-  DateTime? _backgroundStartTime;
+  List<List<int>> _slideDurations = [];
+  int _backgroundStartTime = 0;
+  int _lastTimestamp = 0;
+  bool wasInBackground = false;
+  int backgroundDuration = 0;
 
   Timer? _timer;
 
@@ -118,16 +117,16 @@ class _LectureRecorderState extends State<LectureRecorder>
       if (state == AppLifecycleState.paused) {
         // App goes into the background
         _audioRecorder?.pause();
-        _backgroundStartTime = DateTime.now();
+        _backgroundStartTime = DateTime.now().millisecondsSinceEpoch;
         _stopwatch.stop();
+        wasInBackground = true;
       } else if (state == AppLifecycleState.resumed) {
         // App comes back to the foreground
         _audioRecorder?.resume();
-        if (_backgroundStartTime != null) {
+        if (_backgroundStartTime != 0) {
           int backgroundDuration =
-              DateTime.now().difference(_backgroundStartTime!).inMilliseconds;
-          _backgroundDurations.add([_currentPageIndex, backgroundDuration]);
-          _backgroundStartTime = null;
+              DateTime.now().millisecondsSinceEpoch - _backgroundStartTime;
+          this.backgroundDuration += backgroundDuration;
         }
         _stopwatch.start();
       }
@@ -171,11 +170,9 @@ class _LectureRecorderState extends State<LectureRecorder>
     );
     setState(() {
       _isRecording = true;
-      _slideTimestamps = [
-        [null, DateTime.now().millisecondsSinceEpoch]
-      ];
-      _startSlide = _currentPageIndex;
-      _startTime = DateTime.now();
+      backgroundDuration = 0;
+      wasInBackground = false;
+      _lastTimestamp = DateTime.now().millisecondsSinceEpoch;
     });
   }
 
@@ -186,7 +183,7 @@ class _LectureRecorderState extends State<LectureRecorder>
     await _audioRecorder!.stop();
     setState(() {
       _isRecording = false;
-      _slideTimestamps.add([null, DateTime.now().millisecondsSinceEpoch]);
+      trackSlideDuration();
     });
     // Merge audio and video after stopping the recording
     _mergeAudioAndVideo();
@@ -253,37 +250,8 @@ class _LectureRecorderState extends State<LectureRecorder>
     final tempDir = await getTemporaryDirectory();
     final videoPath = '${tempDir.path}/video_slides.mp4';
 
-    // Create a temporary file with the list of input files and durations
-    List<int> slideIndices = [_startSlide];
-    List<int> slideDurations = [];
-
-    for (int i = 1; i < _slideTimestamps.length - 1; i++) {
-      int duration = _slideTimestamps[i][1] - _slideTimestamps[i - 1][1];
-      slideDurations.add(duration);
-
-      if (_slideTimestamps[i][0]) {
-        // Forward button pressed
-        slideIndices.add(slideIndices.last + 1);
-      } else {
-        // Backward button pressed
-        slideIndices.add(slideIndices.last - 1);
-      }
-    }
-    slideDurations.add(
-        _slideTimestamps.last[1]); //get time when the recording was stopped
-
-    if (Platform.isIOS) {
-      // Subtract background durations from slideDurations
-      for (final entry in _backgroundDurations) {
-        int slideIndex = slideIndices.indexOf(entry[0]);
-        if (slideIndex != -1) {
-          slideDurations[slideIndex] -= entry[1];
-        }
-      }
-    }
-
-    final concatFileContent = List.generate(slideIndices.length, (i) {
-      return 'file ${slideImages[slideIndices[i]].path}\nduration ${slideDurations[i] / 1000}';
+    final concatFileContent = List.generate(_slideDurations.length, (i) {
+      return 'file ${slideImages[_slideDurations[i][0]].path}\nduration ${_slideDurations[i][1] / 1000}';
     }).join('\n');
     final concatFilePath = '${tempDir.path}/concat.txt';
     final concatFile = File(concatFilePath);
@@ -363,7 +331,7 @@ class _LectureRecorderState extends State<LectureRecorder>
 
     //reset vars
     _isRecording = false;
-    _slideTimestamps = [];
+    _slideDurations = [];
     setState(() {
       _isMerging = false;
     });
@@ -407,6 +375,17 @@ class _LectureRecorderState extends State<LectureRecorder>
         );
       },
     );
+  }
+
+  void trackSlideDuration() {
+    int duration = DateTime.now().millisecondsSinceEpoch - _lastTimestamp;
+    _lastTimestamp = DateTime.now().millisecondsSinceEpoch;
+    if (wasInBackground) {
+      duration -= backgroundDuration;
+    }
+    _slideDurations.add([_currentPageIndex, duration]);
+    backgroundDuration = 0;
+    wasInBackground = false;
   }
 
   @override
@@ -490,15 +469,12 @@ class _LectureRecorderState extends State<LectureRecorder>
                       //Backwards Button
                       onPressed: _currentPageIndex > 0 && !_isMerging
                           ? () {
+                              if (_isRecording) {
+                                trackSlideDuration();
+                              }
                               setState(() {
                                 _currentPageIndex--;
                               });
-                              if (_isRecording) {
-                                _slideTimestamps.add([
-                                  false,
-                                  DateTime.now().millisecondsSinceEpoch
-                                ]);
-                              }
                             }
                           : null,
                       icon: const Icon(Icons.arrow_back),
@@ -512,15 +488,12 @@ class _LectureRecorderState extends State<LectureRecorder>
                             _pdfDocument != null &&
                             _currentPageIndex + 1 < getPdfPageCount()
                         ? () {
+                            if (_isRecording) {
+                              trackSlideDuration();
+                            }
                             setState(() {
                               _currentPageIndex++;
                             });
-                            if (_isRecording) {
-                              _slideTimestamps.add([
-                                true,
-                                DateTime.now().millisecondsSinceEpoch
-                              ]);
-                            }
                           }
                         : null,
                     icon: const Icon(Icons.arrow_forward),

@@ -50,7 +50,7 @@ class _LectureHistoryState extends State<LectureHistory> {
   Future<void> _shareLecture(String lectureFile) async {
     final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
     String lecturePath = '${appDocumentsDir.path}/$lectureFile';
-    await Share.shareFiles([lecturePath], text: 'Lecture video');
+    await Share.shareFiles([lecturePath]);
   }
 
   Future<void> _deleteLecture(String lectureFile) async {

@@ -5,7 +5,7 @@
 import FlutterMacOS
 import Foundation
 
-import ffmpeg_kit_flutter
+import ffmpeg_kit_flutter_https_gpl
 import path_provider_foundation
 import pdf_render
 import record_macos

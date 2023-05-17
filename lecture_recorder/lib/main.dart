@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit_config.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:ffmpeg_kit_flutter_https_gpl/ffmpeg_kit_config.dart';
+import 'package:ffmpeg_kit_flutter_https_gpl/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
@@ -22,7 +22,7 @@ import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_https_gpl/ffmpeg_kit.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
@@ -65,10 +65,10 @@ class LectureRecorder extends StatefulWidget {
   const LectureRecorder({Key? key}) : super(key: key);
 
   @override
-  _LectureRecorderState createState() => _LectureRecorderState();
+  LectureRecorderState createState() => LectureRecorderState();
 }
 
-class _LectureRecorderState extends State<LectureRecorder>
+class LectureRecorderState extends State<LectureRecorder>
     with WidgetsBindingObserver {
   PdfDocumentLoader? _pdfDocumentLoader;
   PdfDocument? _pdfDocument;
@@ -85,14 +85,11 @@ class _LectureRecorderState extends State<LectureRecorder>
   bool wasInBackground = false;
   int backgroundDuration = 0;
   double _mergeProgress = 0.0;
-
   Timer? _timer;
-
   bool _isMerging = false;
-
   bool _wakelockWhileRecording = true;
-
   int _videoQuality = 720;
+  String _lectureFile = '';
 
   @override
   void initState() {
@@ -155,13 +152,17 @@ class _LectureRecorderState extends State<LectureRecorder>
     _stopwatch.reset();
     _stopwatch.start();
 
+    DateTime now = DateTime.now();
+    String formattedDate = DateFormat('yyMMddHHmm').format(now);
+    _lectureFile = 'lecture_$formattedDate.mp4';
+
     Map<String, dynamic> settings = await getSettings();
     _videoQuality = settings['videoQuality'];
     _wakelockWhileRecording = settings['wakelockWhileRecording'];
 
     if (_wakelockWhileRecording) Wakelock.enable();
 
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {});
     });
     Directory tempDir = await getTemporaryDirectory();
@@ -189,7 +190,7 @@ class _LectureRecorderState extends State<LectureRecorder>
       _mergeProgress = 0.0;
     });
     // Merge audio and video after stopping the recording
-    _mergeAudioAndVideo();
+    _generateVideoFromSlides();
 
     if (_wakelockWhileRecording) Wakelock.disable();
   }
@@ -211,19 +212,20 @@ class _LectureRecorderState extends State<LectureRecorder>
         });
       }
     } catch (e) {
-      print('Error while picking the PDF file: $e');
+      _showErrorDialog('Error while picking the PDF file: $e');
     }
   }
 
-  Future<void> deleteCache(videoPath) async {
-    File videoFile = File(videoPath);
+  Future<void> deleteAudio() async {
     File audioFile = File(_audioPath);
-    if (await videoFile.exists()) await videoFile.delete();
-    if (await videoFile.exists()) await audioFile.delete();
+    if (await audioFile.exists()) await audioFile.delete();
   }
 
-  Future<bool> _generateVideoFromSlides() async {
-    if (_pdfDocument == null) return false;
+  void _generateVideoFromSlides() async {
+    if (_pdfDocument == null) return;
+    setState(() {
+      _isMerging = true;
+    });
 
     List<File> slideImages = [];
 
@@ -250,31 +252,55 @@ class _LectureRecorderState extends State<LectureRecorder>
     }
 
     // Generate video from slide images
-    final tempDir = await getTemporaryDirectory();
-    final videoPath = '${tempDir.path}/video_slides.mp4';
+    Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+    Directory tempDir = await getTemporaryDirectory();
 
-    final concatFileContent = List.generate(_slideDurations.length, (i) {
-      return 'file ${slideImages[_slideDurations[i][0]].path}\nduration ${_slideDurations[i][1] / 1000}';
-    }).join('\n');
+    final outputPath = '${appDocumentsDir.path}/$_lectureFile';
+
+    final concatFileContent =
+        'ffconcat version 1.0\n${List.generate(_slideDurations.length, (i) {
+      String result =
+          'file ${slideImages[_slideDurations[i][0]].path}\nduration ${_slideDurations[i][1] / 1000}';
+      // Duplicate the last file after the final duration
+      if (i == _slideDurations.length - 1) {
+        result += '\nfile ${slideImages[_slideDurations[i][0]].path}';
+      }
+      return result;
+    }).join('\n')}';
+
     final concatFilePath = '${tempDir.path}/concat.txt';
     final concatFile = File(concatFilePath);
     await concatFile.writeAsString(concatFileContent);
 
     // Generate the video using the concat demuxer
     bool isSuccess = false;
+
+    FFmpegKitConfig.enableStatisticsCallback((statistics) {
+      double timeInSec = statistics.getTime() / 1000;
+      double totalTimeInSec = _stopwatch.elapsed.inSeconds.toDouble();
+      if (totalTimeInSec == 0) return;
+      setState(() {
+        _mergeProgress = (timeInSec / totalTimeInSec).clamp(0, 1);
+      });
+    });
+
+    File mergedFile = File(_lectureFile);
+
     await FFmpegKit.execute(
-            '-f concat -safe 0 -i $concatFilePath -vsync vfr -pix_fmt yuv420p -y $videoPath')
+            '-safe 0 -i $concatFilePath -i $_audioPath -c:v libx264 -vf "fps=25,scale=-2:$_videoQuality" -pix_fmt yuv420p -c:a copy -y $outputPath')
         .then((session) async {
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
-        print('Generated video from slides successfully: $videoPath');
+        //delete audio and video files
+        deleteAudio();
+        //share the lecture video
+        await Share.shareFiles([outputPath]);
         isSuccess = true;
       } else {
-        var output = await session.getFailStackTrace();
-        print('Error generating video from slides: $output');
-        await deleteCache(videoPath);
-        _showErrorDialog('Error generating video from slides: $output');
+        var output = await session.getAllLogsAsString();
+        await deleteAudio();
+        _showErrorDialog('Error merging video: $output');
       }
     });
 
@@ -284,75 +310,15 @@ class _LectureRecorderState extends State<LectureRecorder>
     }
     await concatFile.delete();
 
-    return isSuccess;
-  }
-
-  void _mergeAudioAndVideo() async {
-    bool isFirstCommand =
-        true; // Add a flag to check which command is being executed to calc the progress
-    double totalProgress = 0.0;
-
-    FFmpegKitConfig.enableStatisticsCallback((statistics) {
-      double timeInSec = statistics.getTime() / 1000;
-      double totalTimeInSec = _stopwatch.elapsed.inSeconds.toDouble();
-      if (totalTimeInSec == 0) return;
-      double progress = (timeInSec / totalTimeInSec).clamp(0, 1);
-      if (isFirstCommand) {
-        totalProgress = progress * 0.5;
-      } else {
-        totalProgress = 0.5 + progress * 0.5;
-      }
-      setState(() {
-        _mergeProgress = totalProgress;
-      });
-    });
-
-    setState(() {
-      _isMerging = true;
-    });
-    bool isVideoGenerated = await _generateVideoFromSlides();
-    if (!isVideoGenerated) {
-      print('Failed to generate video from slides, aborting merge');
+    if (!isSuccess) {
+      _showErrorDialog('An unknown error occurred while merging the video.');
       setState(() {
         _isMerging = false;
       });
       return;
     }
 
-    // Merge the video stream with the recorded audio
-    Directory tempDir = await getTemporaryDirectory();
-    String videoPath = '${tempDir.path}/video_slides.mp4';
-
-    DateTime now = DateTime.now();
-    String formattedDate = DateFormat('yyMMddHH').format(now);
-    Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    String lectureFile = 'lecture_$formattedDate.mp4';
-    String outputPath = '${appDocumentsDir.path}/$lectureFile';
-
-    File mergedFile = File(outputPath);
     if (await mergedFile.exists()) await mergedFile.delete();
-
-    isFirstCommand = false; // Update the flag before the second command
-
-    await FFmpegKit.execute(
-            '-i $videoPath -i $_audioPath -c:v copy -c:a aac $outputPath')
-        .then((session) async {
-      final returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        print('Merged video and audio successfully: $outputPath');
-        //delete audio and video files
-        deleteCache(videoPath);
-        //share the lecture video
-        await Share.shareFiles([outputPath]);
-      } else {
-        var output = await session.getFailStackTrace();
-        print('Error merging video: $output');
-        await deleteCache(videoPath);
-        _showErrorDialog('Error merging video: $output');
-      }
-    });
-
     //reset vars
     _isRecording = false;
     _slideDurations = [];
@@ -374,15 +340,18 @@ class _LectureRecorderState extends State<LectureRecorder>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Error Occurred'),
-          content: Text(errorMessage),
+          title: const Text('Error Occurred'),
+          content: SingleChildScrollView(
+            // <-- Wrap the Text widget with SingleChildScrollView
+            child: Text(errorMessage),
+          ),
           actions: <Widget>[
             TextButton(
-              child: Text('Copy Error Message'),
+              child: const Text('Copy Error Message'),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: errorMessage));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  const SnackBar(
                     content: Text('Error message copied to clipboard'),
                   ),
                 );
@@ -390,7 +359,7 @@ class _LectureRecorderState extends State<LectureRecorder>
               },
             ),
             TextButton(
-              child: Text('Close'),
+              child: const Text('Close'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -454,11 +423,11 @@ class _LectureRecorderState extends State<LectureRecorder>
                         ? CircularProgressIndicator(
                             value: _mergeProgress,
                           )
-                        : CircularProgressIndicator(),
+                        : const CircularProgressIndicator(),
                     if (_mergeProgress > 0)
                       Text(
                         '${(_mergeProgress * 100).round()}%',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16.0,
                           color: Colors.black,
                         ),
@@ -481,7 +450,7 @@ class _LectureRecorderState extends State<LectureRecorder>
                   if (_isRecording)
                     Text(
                       '${_stopwatch.elapsed.inHours.toString().padLeft(2, '0')}:${_stopwatch.elapsed.inMinutes.remainder(60).toString().padLeft(2, '0')}:${_stopwatch.elapsed.inSeconds.remainder(60).toString().padLeft(2, '0')}',
-                      style: TextStyle(fontSize: 16),
+                      style: const TextStyle(fontSize: 16),
                     ),
                 ],
               ),
@@ -498,7 +467,7 @@ class _LectureRecorderState extends State<LectureRecorder>
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 if (_pdfDocumentLoader == null)
-                  Expanded(
+                  const Expanded(
                     child: Center(
                       child: Text(
                         'Add a PDF using the "+" button to get started',

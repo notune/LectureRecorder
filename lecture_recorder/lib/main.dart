@@ -258,13 +258,52 @@ class LectureRecorderState extends State<LectureRecorder>
 
     final outputPath = '${appDocumentsDir.path}/$_lectureFile';
 
+    // Slide durations in seconds
+    List<int> _slideDurations = [
+      120,
+      180,
+      205,
+      130,
+      250,
+      195,
+      210,
+      100,
+      200,
+      150,
+      230,
+      170,
+      250,
+      180,
+      220,
+      210,
+      170,
+      160,
+      150,
+      130,
+      240,
+      195,
+      200,
+      210,
+      130,
+      240,
+      195,
+      180,
+      230,
+      210,
+      160,
+      180,
+      250,
+      200,
+      210
+    ];
+
     final concatFileContent =
         'ffconcat version 1.0\n${List.generate(_slideDurations.length, (i) {
       String result =
-          'file ${slideImages[_slideDurations[i][0]].path}\nduration ${_slideDurations[i][1] / 1000}';
+          'file ${slideImages[i].path}\nduration ${_slideDurations[i]}';
       // Duplicate the last file after the final duration
       if (i == _slideDurations.length - 1) {
-        result += '\nfile ${slideImages[_slideDurations[i][0]].path}';
+        result += '\nfile ${slideImages[i].path}';
       }
       return result;
     }).join('\n')}';
@@ -276,19 +315,47 @@ class LectureRecorderState extends State<LectureRecorder>
     // Generate the video using the concat demuxer
     bool isSuccess = false;
 
+    bool isFirstCommand =
+        true; // Add a flag to check which command is being executed to calc the progress
+    double totalProgress = 0.0;
+
     FFmpegKitConfig.enableStatisticsCallback((statistics) {
       double timeInSec = statistics.getTime() / 1000;
       double totalTimeInSec = _stopwatch.elapsed.inSeconds.toDouble();
       if (totalTimeInSec == 0) return;
+      double progress = (timeInSec / totalTimeInSec).clamp(0, 1);
+      if (isFirstCommand) {
+        totalProgress = progress * 0.5;
+      } else {
+        totalProgress = 0.5 + progress * 0.5;
+      }
       setState(() {
-        _mergeProgress = (timeInSec / totalTimeInSec).clamp(0, 1);
+        _mergeProgress = totalProgress;
       });
     });
 
     File mergedFile = File(_lectureFile);
 
+    // First pass: generate a VFR video
+    final vfrOutputPath = '${tempDir.path}/vfr_video.mp4';
+
     await FFmpegKit.execute(
-            '-safe 0 -i $concatFilePath -i $_audioPath -c:v mpeg4 -preset ultrafast -vsync vfr -pix_fmt yuv420p -c:a copy -y $outputPath')
+            '-safe 0 -i $concatFilePath -i $_audioPath -c:v libx264 -preset ultrafast -vsync vfr -vf "scale=-2:$_videoQuality" -pix_fmt yuv420p -c:a copy -y $vfrOutputPath')
+        .then((session) async {
+      final returnCode = await session.getReturnCode();
+
+      if (!ReturnCode.isSuccess(returnCode)) {
+        var output = await session.getAllLogsAsString();
+        await deleteAudio();
+        _showErrorDialog('Error creating video: $output');
+      }
+    });
+
+    isFirstCommand = false;
+
+    // Second pass: convert the VFR video to CFR
+    await FFmpegKit.execute(
+            '-i $vfrOutputPath -vf "fps=25" -c:v rawvideo -preset ultrafast -pix_fmt yuv420p -c:a copy -y $outputPath')
         .then((session) async {
       final returnCode = await session.getReturnCode();
 
@@ -301,7 +368,7 @@ class LectureRecorderState extends State<LectureRecorder>
       } else {
         var output = await session.getAllLogsAsString();
         await deleteAudio();
-        _showErrorDialog('Error merging video: $output');
+        _showErrorDialog('Error creating video: $output');
       }
     });
 
@@ -310,6 +377,8 @@ class LectureRecorderState extends State<LectureRecorder>
       await imageFile.delete();
     }
     await concatFile.delete();
+    // Delete the temporary VFR video
+    await File(vfrOutputPath).delete();
 
     if (!isSuccess) {
       _showErrorDialog('An unknown error occurred while merging the video.');

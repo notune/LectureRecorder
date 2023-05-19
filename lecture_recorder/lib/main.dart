@@ -288,7 +288,7 @@ class LectureRecorderState extends State<LectureRecorder>
     File mergedFile = File(_lectureFile);
 
     await FFmpegKit.execute(
-            '-safe 0 -i $concatFilePath -i $_audioPath -c:v libx264 -preset veryfast -vf "fps=25,scale=-2:$_videoQuality" -pix_fmt yuv420p -c:a copy -y $outputPath')
+            '-safe 0 -i $concatFilePath -i $_audioPath -c:v mpeg4 -preset ultrafast -vsync vfr -pix_fmt yuv420p -c:a copy -y $outputPath')
         .then((session) async {
       final returnCode = await session.getReturnCode();
 

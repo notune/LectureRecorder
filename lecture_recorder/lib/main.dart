@@ -373,7 +373,6 @@ class LectureRecorderState extends State<LectureRecorder>
         return AlertDialog(
           title: const Text('Error Occurred'),
           content: SingleChildScrollView(
-            // <-- Wrap the Text widget with SingleChildScrollView
             child: Text(errorMessage),
           ),
           actions: <Widget>[

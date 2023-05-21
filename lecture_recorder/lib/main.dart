@@ -420,22 +420,31 @@ class LectureRecorderState extends State<LectureRecorder>
         title: const Text('Lecture Recorder'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const Settings()),
-              );
-            },
+            icon: Icon(Icons.settings,
+                color:
+                    (_isRecording || _isMerging) ? Colors.grey : Colors.white),
+            onPressed: (_isRecording || _isMerging)
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const Settings()),
+                    );
+                  },
           ),
           IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LectureHistory()),
-              );
-            },
+            icon: Icon(Icons.history,
+                color:
+                    (_isRecording || _isMerging) ? Colors.grey : Colors.white),
+            onPressed: (_isRecording || _isMerging)
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LectureHistory()),
+                    );
+                  },
           ),
         ],
       ),
@@ -501,7 +510,7 @@ class LectureRecorderState extends State<LectureRecorder>
                   const Expanded(
                     child: Center(
                       child: Text(
-                        'Add a PDF using the "+" button to get started',
+                        'Tap "+" to add lecture slides PDF',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 16),
                       ),

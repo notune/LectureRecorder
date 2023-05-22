@@ -30,6 +30,10 @@
 	<string>This app requires access to the microphone for recording audio.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app requires access to the photo library for saving lecture recordings.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>The application does not use this feature</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The application does not use this feature</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

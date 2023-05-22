@@ -26,7 +26,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:ffmpeg_kit_flutter_https_gpl/ffmpeg_kit.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
-import 'package:share_plus/share_plus.dart';
+import 'package:share_extend/share_extend.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -324,7 +324,7 @@ class LectureRecorderState extends State<LectureRecorder>
         //delete audio and video files
         deleteAudio();
         //share the lecture video
-        await Share.shareFiles([outputPath]);
+        await ShareExtend.share(outputPath, "video");
         isSuccess = true;
       } else {
         var output = await session.getAllLogsAsString();

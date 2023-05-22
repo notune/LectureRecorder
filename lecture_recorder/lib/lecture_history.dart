@@ -17,7 +17,7 @@ along with Lecture Recorder. If not, see <https://www.gnu.org/licenses/>.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:share_extend/share_extend.dart';
 
 class LectureHistory extends StatefulWidget {
   const LectureHistory({Key? key}) : super(key: key);
@@ -51,7 +51,7 @@ class _LectureHistoryState extends State<LectureHistory> {
   Future<void> _shareLecture(String lectureFile) async {
     final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
     String lecturePath = '${appDocumentsDir.path}/$lectureFile';
-    await Share.shareFiles([lecturePath]);
+    await ShareExtend.share(lecturePath, "video");
   }
 
   Future<void> _deleteLecture(String lectureFile) async {

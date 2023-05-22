@@ -38,7 +38,7 @@ dependencies:
   record: ^4.4.4
   image: ^3.0.2
   # image: ^4.0.15
-  share_plus: ^6.3.3
+  share_extend: "^2.0.0"
   wakelock: ^0.6.2
   intl: ^0.18.1
   shared_preferences: ^2.1.0

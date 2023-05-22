@@ -63,6 +63,9 @@ post_install do |installer|
         ## dart: PermissionGroup.photos
         'PERMISSION_PHOTOS=0',
 
+        ## dart: PermissionGroup.photos
+        'PERMISSION_PHOTOS_ADD_ONLY=1',
+
         ## dart: [PermissionGroup.location, PermissionGroup.locationAlways, PermissionGroup.locationWhenInUse]
         'PERMISSION_LOCATION=0',
 

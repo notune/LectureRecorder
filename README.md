@@ -3,6 +3,8 @@
 
 Lecture Recorder is a cross-platform app that allows you to record lectures using your mobile device. The app records audio via the built-in microphone and synchronizes it with the linked slides, creating a video file for future reference. The app is compatible with Android and iOS.
 
+[![Download on the App Store](https://github.com/dravolin/LectureRecorder/raw/main/assets/app_store_badge.svg)](https://apps.apple.com/app/lecturerecorder-slides-audio/id6449231186)
+
 ## How it works
 
 The App keeps track of which slides you go to while recording the audio to later merge it into one video file. This takes a few minutes depending on your device.

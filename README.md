@@ -17,6 +17,9 @@ The App keeps track of which slides you go to while recording the audio to later
 ## System Requirements
 Minimum Android 8.0 (API 26) or iOS 12.1
 
+## Disclaimer
+Before using this application to record lectures, please be aware of your local and national laws regarding the recording of conversations without consent. Regulations vary by location and violation of these laws could have legal consequences. Also, always adhere to your educational institution's policies on lecture recording. When in doubt, it's best to ask your professor for permission before recording. Always respect individual privacy and intellectual property rights. Please remember that recordings should be used for personal reference only and should not be distributed without explicit permission.
+
 ## Building
 
 ### Prerequisites
